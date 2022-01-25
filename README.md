@@ -1,5 +1,7 @@
 # Recovery of sparse urban greenhouse gas emissions
 
+[![DOI](https://zenodo.org/badge/450792204.svg)](https://zenodo.org/badge/latestdoi/450792204)
+
 This is the code for the paper "Recovery of sparse urban greenhouse gas emissions"
 and reproduces the results in the paper given the right input files.
 The input files are not part of this repository.
@@ -28,4 +30,6 @@ The code in subfolders are functions needed for the scripts and do not fulfill o
 
 ## How to cite
 
-Please cite our paper if you use this code.
+DOI of the github repository: [![DOI](https://zenodo.org/badge/450792204.svg)](https://zenodo.org/badge/latestdoi/450792204)
+
+Please also cite our paper if you use this code.
