@@ -4,7 +4,7 @@ function [new_footprint] = reshape_footprint(footprint, old_size_x, old_size_y, 
 scale_x = old_size_x / new_size_x;
 scale_y = old_size_y / new_size_y;
 correction_factor = scale_x * scale_y;
-fprintf("correction factor for footprint is %f\n", correction_factor);
+% fprintf("correction factor for footprint is %f\n", correction_factor);
 amount_measurements = size(footprint, 1);
 new_footprint = zeros(amount_measurements, new_size_x * new_size_y);
 for i=1:amount_measurements

@@ -15,9 +15,6 @@ normalize_columns = @(X)X/(diag(sqrt(diag(X'*X))));
 get_normalization_vector = @(X)eye(size(X, 2))/diag(sqrt(diag(X'*X)));
 
 %% Input data
-map = "co2_vienna.nc";
-city_name = "Vienna";
-
 output_path_folder = '../output/wind_coverage';
 
 sensing_matrix_path = "../data/footprint/wind_variation.nc";
@@ -30,6 +27,28 @@ measurement_station_names = ["A"; "B"; "C"; "D"; "E"; "F"; "G"; "H";
 
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.015;
+
+use_pseudo_emission_map = true;
+%% for real emission map
+if use_pseudo_emission_map == false
+map = "co2_munich.nc";
+city_name = "Munich";
+
+ncfile = "../data/emission_map/" + map;
+co2 = ncread(ncfile, 'CO2Diffuse');
+co2 = 1e-4 * co2; % convert to ymol/m^2/s
+
+longitudes = ncread(ncfile, 'longitude');
+latitudes = ncread(ncfile, 'latitude');
+end
+
+%% for pseudo emission map
+if use_pseudo_emission_map == true
+city_name = "Pseudo";
+co2 = generate_pseudo_emissions(32,32,0.8);
+warning("A pseudo emission inventory is used!");
+end
+emission_map = co2;
             
 %% Preprocessing
 angle_coverage = [];
@@ -54,11 +73,6 @@ end
 
 
 least_square_error = [];
-
-ncfile = "../data/emission_map/" + map;
-emission_map = ncread(ncfile, 'CO2Diffuse');
-emission_map = 1e-4 * emission_map;
-
 
 size_x = size(emission_map, 1);
 size_y = size(emission_map, 2);

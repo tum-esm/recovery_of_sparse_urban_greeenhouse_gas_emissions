@@ -136,21 +136,52 @@ fprintf(fileID, "The l1 reconstruction error using least squares is %f\n", norm(
 fprintf(fileID, "\n");
 %% Plotting l1 reconstructed emission map vs real emission map
 max_color = max(max(max(emission_map)), max(max(emission_L1)));
-h=figure('Position', [100, 100, 1024, 512]);
-h1 = subplot(1,2,1);
+h=figure();
 imagesc(emission_L1, [0, max_color]);
-title("reconstructed emission");
-hold on
-h2 = subplot(1,2,2);
-imagesc(emission_map, [0, max_color]);
-title("real emission");
-sgtitle("Comparison L1 reconstruction to Real Emissions")
-%grid minor
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("SR reconstruction");
+grid minor
 set(findall(gcf,'-property','FontSize'),'FontSize',12)
 set(h,'Units','Inches');
 pos = get(h,'Position');
 set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
-print(h,strcat(output_path, 'maps_l1_real_comparision'),'-dpdf','-r0')
+print(h,strcat(output_path, 'l1_reconstruction'),'-dpdf','-r0')
+
+h=figure();
+imagesc(emission_l2, [0, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("LS reconstruction");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'l2_reconstruction'),'-dpdf','-r0')
+
+h = figure();
+imagesc(emission_map, [0, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("Real emissions");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'real_emissions'),'-dpdf','-r0')
+
+hf = figure('Position', [100 100 1024 250]); 
+hCB = colorbar('north');
+caxis([0 max_color]);
+xlabel(hCB, '{\it mol m^{-2} s^{-1}}');
+set(gca,'Visible',false)
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(hf,'Units','Inches');
+pos = get(hf,'Position');
+set(hf,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(hf,strcat(output_path, 'colorbar'),'-dpdf','-r0')
 
 
 %% Plotting not discovered elements vs false discovered elements

@@ -19,9 +19,6 @@ logn = @(a, n) log(a) / log(n);
 
 %% Input data
 
-map = "co2_vienna.nc";
-city_name = "Vienna";
-
 output_path_folder = '../output/case_studies/';
 
 sensing_matrix_path = "../data/footprint/synthtetic.nc";
@@ -38,9 +35,26 @@ dwt_level = 3;
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.015;
 
+use_pseudo_emission_map = true;
+%% for real emission map
+if use_pseudo_emission_map == false
+map = "co2_munich.nc";
+city_name = "Munich";
+
 ncfile = "../data/emission_map/" + map;
 co2 = ncread(ncfile, 'CO2Diffuse');
-co2 = 1e-4 * co2; % convert co2 scale
+co2 = 1e-4 * co2; % convert to ymol/m^2/s
+
+longitudes = ncread(ncfile, 'longitude');
+latitudes = ncread(ncfile, 'latitude');
+end
+
+%% for pseudo emission map
+if use_pseudo_emission_map == true
+city_name = "Pseudo";
+co2 = generate_pseudo_emissions(32,32,0.8);
+warning("A pseudo emission inventory is used!");
+end
 
 %% Preprocessing
 
@@ -142,6 +156,14 @@ fprintf(fileID, "\n");
 fprintf(fileID, "The l2 reconstruction error using least squares is %f\n", norm(emission_l2_vec - emission_map_vec, 2)/norm(emission_map_vec,2));
 fprintf(fileID, "The l1 reconstruction error using least squares is %f\n", norm(emission_l2_vec - emission_map_vec, 1)/norm(emission_map_vec,1));
 fprintf(fileID, "\n");
+fprintf(fileID, "LS estimated %d emitters to be negative.\n", sum(emission_l2_vec(emission_l2_vec < 0) ~= 0));
+fprintf(fileID, "SR estimated %d emitters to be negative.\n", sum(emission_L1_vec(emission_L1_vec < 0) ~= 0));
+fprintf(fileID, "SR DWT estimated %d emitters to be negative.\n", sum(emission_L1_vec_by_DWT(emission_L1_vec_by_DWT < 0) ~= 0));
+fprintf(fileID, "\n");
+fprintf(fileID, "LS estimated a total of %f negative emissions.\n", sum(emission_l2_vec(emission_l2_vec < 0)));
+fprintf(fileID, "SR estimated a total of %f negative emissions.\n", sum(emission_L1_vec(emission_L1_vec < 0)));
+fprintf(fileID, "SR DWT estimated a total of %f negative emissions.\n", sum(emission_L1_vec_by_DWT(emission_L1_vec_by_DWT < 0)));
+fprintf(fileID, "\n");
 %% Plotting l1 reconstructed emission map vs real emission map
 max_color = max([max(max(emission_map)), max(max(emission_L1)), max(max(emission_L1_by_DWT))]);
 h=figure('Position', [100, 100, 3*512, 512]);
@@ -167,10 +189,87 @@ pos = get(h,'Position');
 set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
 print(h,strcat(output_path, 'maps_l1_real_comparision'),'-dpdf','-r0')
 
+%% Plotting l1 reconstructed emission map vs real emission map
+max_color = max([max(max(emission_map)), max(max(emission_L1)), max(max(emission_L1_by_DWT)), max(max(emission_l2))]);
+%min_color = min([min(min(emission_map)), min(min(emission_L1)), min(min(emission_L1_by_DWT)), min(min(emission_l2))]);
+min_color = min(min(emission_map));
+% min_color = 10^(-8)
+
+h=figure();
+imagesc(emission_L1, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("SR reconstruction");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'l1_reconstruction'),'-dpdf','-r0')
+
+h=figure();
+imagesc(emission_L1_by_DWT, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("SR DWT reconstruction");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'l1_DWT_reconstruction'),'-dpdf','-r0')
+
+
+h=figure();
+imagesc(emission_l2, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("LS reconstruction");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'l2_reconstruction'),'-dpdf','-r0')
+
+h = figure();
+imagesc(emission_map, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+title("Real emissions");
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(h,strcat(output_path, 'real_emissions'),'-dpdf','-r0')
+
+hf = figure('Position', [100 100 1024 250]); 
+hCB = colorbar('north');
+caxis([min_color max_color]);
+set(gca,'ColorScale','log')
+xlabel(hCB, '{\it \mu mol m^{-2} s^{-1}}');
+set(gca,'Visible',false)
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(hf,'Units','Inches');
+pos = get(hf,'Position');
+set(hf,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(hf,strcat(output_path, 'colorbar'),'-dpdf','-r0')
+
 
 %% Plotting elemenwtise l2 error in reconstrucion
 h=figure();
 imagesc(sqrt((emission_L1 - emission_map).*(emission_L1 - emission_map))/norm(emission_map_vec, 2));
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
 hold on
 grid minor
 colorbar
@@ -184,6 +283,8 @@ print(h,strcat(output_path, 'elementwise_l2_error_BP'),'-dpdf','-r0')
 %% Plotting elemenwtise l2 error in reconstrucion for DWT
 h=figure();
 imagesc(sqrt((emission_L1_by_DWT - emission_map).*(emission_L1_by_DWT - emission_map))/norm(emission_map_vec, 2));
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
 hold on
 grid minor
 colorbar
@@ -197,6 +298,8 @@ print(h,strcat(output_path, 'elementwise_l2_error_DWT'),'-dpdf','-r0')
 %% Plotting elemenwtise l2 error in reconstrucion for least squares
 h=figure();
 imagesc(sqrt((emission_l2 - emission_map).*(emission_l2 - emission_map))/norm(emission_map_vec, 2));
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
 hold on
 grid minor
 colorbar
@@ -207,6 +310,76 @@ set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(
 title("Rel. L2 error for LS");
 print(h,strcat(output_path, 'elementwise_l2_error_least_square'),'-dpdf','-r0')
 
+
+%% Plotting elementwise l2 errors all
+
+SR_l2_error_map = sqrt((emission_L1 - emission_map).*(emission_L1 - emission_map))/norm(emission_map_vec, 2);
+SR_DWT_l2_error_map = sqrt((emission_L1_by_DWT - emission_map).*(emission_L1_by_DWT - emission_map))/norm(emission_map_vec, 2);
+LS_l2_error_map = sqrt((emission_l2 - emission_map).*(emission_l2 - emission_map))/norm(emission_map_vec, 2);
+
+max_color = max([max(max(SR_l2_error_map)), max(max(SR_DWT_l2_error_map)), max(max(LS_l2_error_map))]);
+min_color = min([min(min(SR_l2_error_map)), min(min(SR_DWT_l2_error_map)), min(min(LS_l2_error_map))]);
+
+
+% L1
+h=figure();
+imagesc(SR_l2_error_map, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+hold on
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+title("Rel. L2 error for SR");
+print(h,strcat(output_path, 'SR_rel_l2_error_map'),'-dpdf','-r0')
+
+% L1 DWT
+h=figure();
+imagesc(SR_DWT_l2_error_map, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+hold on
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+title("Rel. L2 error for SR with DWT");
+print(h,strcat(output_path, 'SR_DWT_rel_l2_error_map'),'-dpdf','-r0')
+
+% L2
+h=figure();
+imagesc(LS_l2_error_map, [min_color, max_color]);
+xlabel("west - east [km]",'FontWeight','bold');
+ylabel("south - north [km]",'FontWeight','bold');
+hold on
+grid minor
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(h,'Units','Inches');
+set(gca,'ColorScale','log')
+set(gca,'YDir','normal') 
+pos = get(h,'Position');
+set(h,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+title("Rel. L2 error for LS");
+print(h,strcat(output_path, 'LS_rel_l2_error_map'),'-dpdf','-r0')
+
+hf = figure('Position', [100 100 1024 250]); 
+hCB = colorbar('north');
+caxis([min_color max_color]);
+set(gca,'ColorScale','log')
+xlabel(hCB, '{\it rel. l2 error}');
+set(gca,'Visible',false)
+set(findall(gcf,'-property','FontSize'),'FontSize',12)
+set(hf,'Units','Inches');
+pos = get(hf,'Position');
+set(hf,'PaperPositionMode','Auto','PaperUnits','Inches','PaperSize',[pos(3), pos(4)])
+print(hf,strcat(output_path, 'rel_error_colorbar'),'-dpdf','-r0')
 
 %% Plotting Smoothed errors
 max_smoothing = max(size_x, size_y);
@@ -259,9 +432,9 @@ fprintf(fileID, "l2 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l2_
 fprintf(fileID, "l2 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l2_error(5));
 fprintf(fileID, "l2 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l2_error(5));
 fprintf(fileID, "\n");
-fprintf(fileID, "l1 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l1_error(5));
-fprintf(fileID, "l1 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l1_error(5));
-fprintf(fileID, "l1 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l1_error(5));
+fprintf(fileID, "l1 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l2_error(5));
+fprintf(fileID, "l1 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l2_error(5));
+fprintf(fileID, "l1 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l2_error(5));
 fprintf(fileID, "\n");
 %% Write total error to file
 total_error_l1 = (sum(emission_L1_vec) - sum(emission_map_vec))/sum(emission_map_vec);

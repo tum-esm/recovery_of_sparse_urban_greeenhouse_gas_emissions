@@ -16,10 +16,6 @@ get_normalization_vector = @(X)eye(size(X, 2))/diag(sqrt(diag(X'*X)));
 
 
 %% Input data
-
-map = "co2_munich.nc";
-city_name = "Munich";
-
 output_path_folder = '../output/sparse_real_city/';
 
 sensing_matrix_path = "../data/footprint/synthtetic.nc";
@@ -36,9 +32,26 @@ dwt_level = 3;
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.015;
 
+use_pseudo_emission_map = true;
+%% for real emission map
+if use_pseudo_emission_map == false
+map = "co2_munich.nc";
+city_name = "Munich";
+
 ncfile = "../data/emission_map/" + map;
 co2 = ncread(ncfile, 'CO2Diffuse');
-co2 = 1e-4 * co2; % convert co2 scale
+co2 = 1e-4 * co2; % convert to ymol/m^2/s
+
+longitudes = ncread(ncfile, 'longitude');
+latitudes = ncread(ncfile, 'latitude');
+end
+
+%% for pseudo emission map
+if use_pseudo_emission_map == true
+city_name = "Pseudo";
+co2 = generate_pseudo_emissions(32,32,0.8);
+warning("A pseudo emission inventory is used!");
+end
 
 
 %% Data to collect

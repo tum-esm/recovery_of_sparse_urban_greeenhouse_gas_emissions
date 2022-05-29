@@ -15,15 +15,6 @@ get_normalization_vector = @(X)eye(size(X, 2))/diag(sqrt(diag(X'*X)));
 
 
 %% Parameters
-maps = ["co2_berlin.nc"; 
-        "co2_hamburg.nc"; 
-        "co2_london.nc";
-        "co2_munich_all_sources.nc";
-        "co2_paris.nc";
-        "co2_vienna.nc"];
-
-map = "co2_paris.nc";
-city_name = "Paris";
 
 sensing_matrix_path = "../data/footprint/synthtetic.nc";
 sensing_threshhold = 1e-9; % threshhold for the sensing matrix
@@ -42,6 +33,24 @@ dwt_level = 3;
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.015;
 
+use_pseudo_emission_map = true;
+%% for real emission map
+if use_pseudo_emission_map == false
+map = "co2_munich.nc";
+city_name = "Munich";
+
+ncfile = "../data/emission_map/" + map;
+co2 = ncread(ncfile, 'CO2Diffuse');
+co2 = 1e-4 * co2; % convert units
+end
+
+%% for pseudo emission map
+if use_pseudo_emission_map == true
+city_name = "Pseudo";
+co2 = generate_pseudo_emissions(32,32,0.8);
+warning("A pseudo emission inventory is used!");
+end
+
 %% Data to collect
 relative_errors = [];
 relative_errors_normalized = [];
@@ -56,11 +65,6 @@ L1_minimum_error = [];
 L1_minimum_error_wavelet = [];
 
 least_square_error = [];
-
-ncfile = "../data/emission_map/" + map;
-co2 = ncread(ncfile, 'CO2Diffuse');
-
-co2 = 1e-4 * co2; % convert co2 scale
 
 size_x = size(co2, 1);
 size_y = size(co2, 2);

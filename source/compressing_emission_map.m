@@ -36,6 +36,7 @@ for i=1:length(maps)
     size_y = size(co2, 2);
     
     co2 = reshape(co2, size_x * size_y, 1);
+    co2 = co2 / 3600; % convert to ymol/m^2/s
     
     n = ceil(size_x * size_y * 0.1);
     

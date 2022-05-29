@@ -4,7 +4,7 @@
 % considered.
 
 %% Load gurobi as cvx solver
-cvx_solver Gurobi
+cvx_solver Gurobi_2
 
 %% functions
 get2 = @(x, i) reshape(x(i, :), size(x, 2), 1);
@@ -16,10 +16,6 @@ logn = @(a, n) log(a) / log(n);
 
 
 %% Input data
-
-map = "co2_vienna.nc";
-city_name = "Vienna";
-
 SNR = 100;
 
 output_path_folder = '../output/case_studies';
@@ -41,9 +37,26 @@ dwt_level = 3;
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.03;
 
+use_pseudo_emission_map = true;
+%% for real emission map
+if use_pseudo_emission_map == false
+map = "co2_munich.nc";
+city_name = "Munich";
+
 ncfile = "../data/emission_map/" + map;
 co2 = ncread(ncfile, 'CO2Diffuse');
-co2 = 1e-4 * co2; % convert co2 scale
+co2 = 1e-4 * co2; % convert to ymol/m^2/s
+
+longitudes = ncread(ncfile, 'longitude');
+latitudes = ncread(ncfile, 'latitude');
+end
+
+%% for pseudo emission map
+if use_pseudo_emission_map == true
+city_name = "Pseudo";
+co2 = generate_pseudo_emissions(32,32,0.8);
+warning("A pseudo emission inventory is used!");
+end
 
 %% Preprocessing
 
@@ -273,10 +286,10 @@ fprintf(fileID, "l2 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l2_
 fprintf(fileID, "l2 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l2_error(5));
 fprintf(fileID, "l2 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l2_error(5));
 fprintf(fileID, "\n");
-fprintf(fileID, "l1 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l1_error(5));
-fprintf(fileID, "l1 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l1_error(5));
-fprintf(fileID, "l1 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l1_error(5));
-fprintf(fileID, "\n");
+% fprintf(fileID, "l1 5 km x 5 km smoothed error for CS is %f\n", l1_smoothing_l1_error(5));
+% fprintf(fileID, "l1 5 km x 5 km smoothed error for CS DWT is %f\n", l1dwt_smoothing_l1_error(5));
+% fprintf(fileID, "l1 5 km x 5 km smoothed error for LSQ is %f\n", l2_smoothing_l1_error(5));
+% fprintf(fileID, "\n");
 %% Write total error to file
 total_error_l1 = (sum(emission_L1_vec) - sum(emission_map_vec))/sum(emission_map_vec);
 total_error_l1_dwt = (sum(emission_L1_vec_by_DWT) - sum(emission_map_vec))/sum(emission_map_vec);
@@ -493,7 +506,7 @@ end
 x_axis_labels = categorical(x_axis_labels, x_axis_labels, 'Ordinal',true);
 h = figure();
 bar(x_axis_labels, [CS_path CS_DWT_path LS_path], 'linewidth',1.5);
-ylim([0.006 1.9])
+ylim([0.015 2.1])
 title("Quantitative Measure");
 hold on
 %bar(x_axis_labels, CS_DWT_path, 'linewidth',1.5);
