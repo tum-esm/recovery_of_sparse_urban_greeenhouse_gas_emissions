@@ -7,7 +7,7 @@ cvx_begin;
     variable x_l1(n);
     minimize( norm(x_l1, 1) );
     subject to
-    0.999 * sum_square(A * x_l1 - b) <= noise_level; %% for numerical reasons 0.999
+    sum_square(A * x_l1 - b) <= noise_level; %% for numerical reasons 0.999
 cvx_end;
 x = x_l1;
 end

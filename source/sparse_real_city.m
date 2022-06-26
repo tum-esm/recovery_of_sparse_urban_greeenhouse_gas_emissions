@@ -90,19 +90,14 @@ amount_measurements = size(sensing_matrix, 1);
 sensing_matrix(sensing_matrix < 0) = 0;
 
 %% Create approx sensing matrix
-temp_sensing_mat = sensing_matrix;
-temp_sensing_mat(temp_sensing_mat < sensing_threshhold) = 0;
-reduction_mask = ~all(~temp_sensing_mat,1);
-
-T = eye(size_x * size_y);
-T = T(reduction_mask, :);
+T = threshold_sensing_matrix(sensing_matrix,sensing_threshhold);
 
 sensing_matrix_tilde = sensing_matrix * transpose(T);
 
 %% Wavelet sensing matrix
 [dwt_sensing_mat, S, wave_size] = DWT_matrix_rows(sensing_matrix, size_x, size_y, dwt_level);
 
-T_dwt = eye(wave_size);
+T_dwt = threshold_sensing_matrix(dwt_sensing_mat, sensing_threshhold);
 
 sensing_matrix_tilde_dwt = dwt_sensing_mat * transpose(T_dwt);
 

@@ -21,14 +21,16 @@ sensing_matrix_path = "../data/footprint/wind_variation.nc";
 
 sensing_threshhold = 1e-9; % threshhold for the sensing matrix
 
-measurement_station_names = ["A"; "B"; "C"; "D"; "E"; "F"; "G"; "H"; 
-                "I"; "J";"K";"L";"M";"N";"O";"P";"Q";"R";"S";"T";"U";
+measurement_station_names = ["A";"B"; "C"; "D"; "E"; "F"; "G"; "H";"I"; "J";"K";"L";"M";"N";"O";"P";"Q";"R";"S";"T";"U";
                 "V";"W";"X";"Y";"Z";"AA";"AB";"AC";"AD";"AE";"AF";"AG";"AH";"AI";"AJ";"AK";"AL";"AI";"AJ";"AK";"AL"];
 
+dwt_level = 3;
 % amount of measurement stations per degree of freedom
 percent_measurement_stations_to_use = 0.015;
 
-use_pseudo_emission_map = true;
+start_by = 4;
+
+use_pseudo_emission_map = false;
 %% for real emission map
 if use_pseudo_emission_map == false
 map = "co2_munich.nc";
@@ -36,7 +38,7 @@ city_name = "Munich";
 
 ncfile = "../data/emission_map/" + map;
 co2 = ncread(ncfile, 'CO2Diffuse');
-co2 = 1e-4 * co2; % convert to ymol/m^2/s
+co2 = 1e-4*co2; % convert to ymol/m^2/s
 
 longitudes = ncread(ncfile, 'longitude');
 latitudes = ncread(ncfile, 'latitude');
@@ -85,45 +87,48 @@ if amount_measurement_stations > length(measurement_station_names)
 end
 
 approx_error = [];
+approx_error_dwt = [];
 approx_error_l2 = [];
 
 %% Loop over all wind angles
-for i=1:length(angle_coverage)
+for i=start_by:length(angle_coverage)
     angle = angle_coverage(i);
     angle_name = angle_names(i);
     
-    sensing_matrix = [];
-    for i=1:amount_measurement_stations
-        tmp = ncread(sensing_matrix_path, append(measurement_station_names(i), '_', angle_name));
-        tmp2 = [];
-        for j=1:size(tmp, 1)
-            tmp3 = reshape(tmp(j, :, :), size(tmp, 2), size(tmp, 3));
-            tmp2 = [tmp2; reshape(imresize(tmp3, [size_x, size_y]), [1, size_x, size_y])];
-        end
-        tmp2 = reshape(tmp2, [size(tmp2, 1), size(tmp2, 2)*size(tmp2, 3)]);
-        sensing_matrix = [sensing_matrix; tmp2];
+    tmp_ms_names = [];
+    for j=1:amount_measurement_stations
+        tmp_ms_names = [tmp_ms_names; append(measurement_station_names(j), '_', angle_name)];
     end
+    collection_sensing_matrix = load_collection_footprint(sensing_matrix_path, tmp_ms_names, size_x, size_y);
+
+
+    % create the sensing matrix
+    sensing_matrix = [];
+    for j=1:amount_measurement_stations
+        tmp = get3(collection_sensing_matrix, j);
+        sensing_matrix = [sensing_matrix; tmp];
+    end
+    amount_measurements = size(sensing_matrix, 1);
     sensing_matrix(sensing_matrix < 0) = 0;
     
 
-    temp_sensing_mat = sensing_matrix;
-    temp_sensing_mat(temp_sensing_mat < sensing_threshhold) = 0;
-    reduction_mask = ~all(~temp_sensing_mat,1);
-    T = eye(size_x * size_y);
-    T = T(reduction_mask, :);
-    
+    T = threshold_sensing_matrix(sensing_matrix,sensing_threshhold);
     sensing_matrix_tilde = sensing_matrix * transpose(T);
     
 
-    obs_vec = double(sensing_matrix_tilde * T * emission_map_vec);
+    obs_vec = double(sensing_matrix*emission_map_vec);
+    %obs_vec_2 = double(sensing_matrix_tilde*T*emission_map_vec);
     
- 
+    max_disturbtion = sensing_threshhold*max(emission_map_vec);
+    %% reconstruction L1
+    
     emission_L1_vec = optimizeL1(sensing_matrix_tilde, obs_vec);
+    if any(isnan(emission_L1_vec))
+        error("nan");
+        %emission_L1_vec=optimizeL1_noise(sensing_matrix_tilde, obs_vec, 1e-7);
+    end
     
     emission_L1_vec = transpose(T) * emission_L1_vec;
-    while any(isnan(emission_L1_vec))
-       error("NAN");
-   end
     
     emission_L1 = reshape(emission_L1_vec, size_x, size_y);
     
@@ -131,6 +136,29 @@ for i=1:length(angle_coverage)
     err = norm(emission_L1_vec - emission_map_vec, 2) / norm(emission_map_vec, 2)
     approx_error = [approx_error; err];
     
+     %% Wavelet sensing matrix
+    [dwt_sensing_mat, S, wave_size] = DWT_matrix_rows(sensing_matrix, size_x, size_y, dwt_level);
+
+    T_dwt = threshold_sensing_matrix(dwt_sensing_mat, sensing_threshhold);
+
+    sensing_matrix_tilde_dwt = dwt_sensing_mat * transpose(T_dwt);
+    
+    %% Wavelet CS
+    emission_L1_dwt_vec = optimizeL1(sensing_matrix_tilde_dwt, obs_vec);
+    if any(isnan(emission_L1_dwt_vec))
+        error("nan");
+        emission_L1_dwt_vec = optimizeL1_noise(sensing_matrix_tilde_dwt, obs_vec, 1e-7);
+   end
+    emission_L1_dwt_vec = transpose(T_dwt) * emission_L1_dwt_vec;
+    
+    emission_L1_by_DWT = waverec2(emission_L1_dwt_vec, S, 'haar');
+
+    emission_L1_vec_by_DWT = reshape(emission_L1_by_DWT, size_x * size_y, 1);
+    
+    err = norm(emission_L1_vec_by_DWT - emission_map_vec, 2) / norm(emission_map_vec, 2);
+    approx_error_dwt = [approx_error_dwt; err];
+    
+    %% reconstruction L2
     emission_l2_vec = pinv(sensing_matrix_tilde, 1e-8) * obs_vec;
     emission_l2_vec = transpose(T) * emission_l2_vec;
     
@@ -144,7 +172,7 @@ for i=1:length(angle_coverage)
 end
 
 
-angle_coverage = 360 * angle_coverage/(2 * pi);
+angle_coverage_degree = 360 * angle_coverage(start_by:end)/(2 * pi);
 %% Generate plotting path
 output_path = strcat(output_path_folder, "/", city_name, "/", "s_", string(size_x * size_y), "ms_", string(percent_measurement_stations_to_use), "/");
 
@@ -154,13 +182,17 @@ mkdir(output_path);
 %% Plotting
 h = figure();
 hold on
-plot(angle_coverage, approx_error, 'x--', 'linewidth', 1.5)
-plot(angle_coverage, approx_error_l2, 'x--', 'linewidth', 1.5)
-legend("SR", "LS")
+plot(angle_coverage_degree, approx_error, 'x--', 'linewidth', 1.5)
+plot(angle_coverage_degree, approx_error_dwt, 'x--', 'linewidth', 1.5)
+plot(angle_coverage_degree, approx_error_l2, 'x--', 'linewidth', 1.5)
+lgd = legend("SR", "SR DWT", "LS");
+lgd.Location = 'northwest';
 xlabel("wind coverage [°]",'FontWeight','bold')
 ylabel("Rel. l_2 error",'FontWeight','bold')
 title(city_name);
-xlim([0 360])
+xlim([80 360])
+%set(gca,'YScale', 'log');
+ylim([0 0.8])
 grid minor
 set(findall(gcf,'-property','FontSize'),'FontSize',12)
 set(h,'Units','Inches');
